@@ -73,7 +73,7 @@ def trim_staff(staff):
 def main():
     if not KEY:
         sys.exit("KP_API_KEY is not set")
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     try:
         with open(PREVIOUS, encoding="utf-8") as f:
             prev = json.load(f)
