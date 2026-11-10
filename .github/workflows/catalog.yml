@@ -1,0 +1,50 @@
+name: Catalog
+
+# Общий каталог для приложения Frame: подборки и карточки фильмов Кинопоиска.
+# Результат — ветка «catalog» с одним файлом catalog.json (история не копится).
+on:
+  schedule:
+    - cron: "17 3,15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: catalog
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Previous catalog
+        run: |
+          git fetch --depth=1 origin catalog:catalog || true
+          if git show catalog:catalog.json > previous.json 2>/dev/null; then
+            echo "previous catalog: $(wc -c < previous.json) bytes"
+          else
+            rm -f previous.json
+          fi
+
+      - name: Build catalog
+        env:
+          KP_API_KEY: ${{ secrets.KP_API_KEY }}
+          CATALOG_PREVIOUS: previous.json
+          CATALOG_OUT: catalog.json
+          MAX_REQUESTS: "120"
+        run: python3 tools/build_catalog.py
+
+      - name: Publish to branch "catalog"
+        run: |
+          mkdir out && mv catalog.json out/
+          cd out
+          git init -q -b catalog
+          git config user.name "frame-catalog-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog.json
+          git commit -q -m "catalog $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" catalog:catalog
